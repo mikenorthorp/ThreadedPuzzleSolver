@@ -74,7 +74,7 @@ as the seed for the random number generator.  The input for the
 goes to "file2".
 
 The puzzle pieces are printed in the same order as in the puzzle.
-That's not an ideal order for testing, but it makes it easier to 
+That's not an ideal order for testing, but it makes it easier to
 ensure that all the pieces are printed.  To shuffle up the piece order,
 store the pieces to a file (called "xxx" below) and then do the following
 UNIX commands (the one with %% is not a UNIX command):
