@@ -1,3 +1,5 @@
+README and code base best viewed on [Github](https://github.com/mikenorthorp/ThreadedPuzzleSolver)
+
 Puzzle
 ======
 

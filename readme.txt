@@ -1,3 +1,5 @@
+README and code base best viewed on [Github](https://github.com/mikenorthorp/ThreadedPuzzleSolver)
+
 Puzzle
 ======
 
@@ -9,6 +11,92 @@ through all of the puzzle pieces to find a match for the grid cell.
 The key function is fill_any_dir, which is designed to fill the
 grid along any one of the sides of the grid.  However, this puzzle
 program only uses one direction.
+
+Installation
+------------
+
+1. Copy files into working directory.
+2. run `make` command in terminal
+
+How To Run
+----------
+
+Run the command `time ./puzzle n < yyy > /dev/null` where yyy is the filename of
+the puzzle generated to try and solve.
+
+If you do not have a puzzle generated, refer to Generate Documentation below.
+
+You can remove the time and /dev/null if
+you want to see the output of the puzzle and no time.
+
+Method Descriptions
+------------------
+
+#### generate.c - Puzzle Generator ####
+
+This file generates the puzzle and solved puzzle for use in the main puzzle
+program. Refer to Generate documentation below for more information.
+
+#### puzzle.c - Main File ####
+
+This takes in a puzzle from STDIN and solves it using multiple threads, then
+outputs the solved puzzle to STDOUT.
+
+#### Puzzle Functions ####
+
+int main(int argc, char **argv );
+
+	- This main function reads in the number of threads as an argument when starting your program. It
+	also creates the different threads depending on the number read in, all with slightly different directions
+	and starting in different corners. It then joins the threads once they are all created, prints out the completed
+	puzzle, and exits the program.
+
+void *puzzleThreadSolver(void *temp);
+
+	- This function is called whenever a thread is created. It handles the logic on how each thread
+	will solve the puzzle, depending on its direction and starting position.
+
+void fill_any_dir( grid_t *grid, piece_list_t *piece_list,
+              int start_col, int start_row, int inc_index );
+
+    - This function actually solves the puzzle row or column it is currently on. It has locking
+    on individual pieces and checks for if a piece is being solved or is solved.
+
+void release_memory( grid_t *grid, piece_list_t *piece_list );
+
+	- This function frees up memory for the grid and piece_list
+
+int get_input( grid_t *grid, piece_list_t *piece_list );
+
+	- This function gets the input from the file in STDIN and stores it in the
+	grid and piece list structs. It also initializes the semaphores in each cell.
+
+void print_edges( grid_t *grid );
+
+	- This displays the set of tabs of the puzzle
+
+void print_grid( grid_t *grid );
+
+	- This prints out the grid of the puzzle
+
+#### Puzzle Structs ####
+
+piece_t
+	- This is the struct for the piece of the puzzle
+
+piece_list_t
+	- This is the struct for the list of pieces of the puzzle
+
+cell_t
+	- This is the struct for a cell, it has a semaphore lock added to it
+
+grid_t
+	- This is a struct for entire grid
+
+fill_t
+	- This is a struct that threads pass in on creation, to be used in the fill_in_dir function.
+
+
 
 Data structures
 ---------------
@@ -25,6 +113,8 @@ we need to get the "west" tab from the grid cell immediately right
 of the current cell.  A consequence of this organization is that
 the grid ends up storing one extra row and one extra column of data
 to give the right and bottom boundaries of the grid.
+
+
 
 
 
@@ -97,4 +187,15 @@ The second data structure is a 2d grid of essentially boolean values
 possible tab value that a puzzle piece can have.  The grid tracks
 which sequences of tab values have been used in pieces already.
 This array is used to ensure that we don't re-use tab sequences.
+
+Test Cases
+==========
+
+See testCases.txt for test cases done
+
+Citations
+=========
+
+The non multithreaded portion of the puzzle.c and the entire generate.c was
+created by Mike McAllister of Dalhousie University
 
