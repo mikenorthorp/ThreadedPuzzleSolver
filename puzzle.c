@@ -43,7 +43,7 @@ typedef struct
     is not uncommon in graphics systems.
 */
 
-/* Added a lock to the cell to lock to keep threads synced */
+/* Added a lock to the cell to keep things synced when solving with threads */
 typedef struct
 {
     sem_t threadLock;
@@ -167,7 +167,7 @@ get_input( grid_t *grid, piece_list_t *piece_list )
             space[i].west = NO_PIECE_INDEX;
             space[i].piece = NULL;
 
-            // Set up lock for this cell
+            // Set up lock for this cell when the pieces are being set up
             sem_init(&space[i].threadLock, 0, 1);
         }
 
@@ -393,10 +393,10 @@ void *puzzleThreadSolver(void *temp)
     start_row = fill->start_row;
     inc_index = fill->inc_index;
 
+    /* Logic for running each thread and which corner and direction */
     // Call fill_to_dir based on inc_index and start row
 
-    // Left to right and right to left
-
+    /* Left to right and right to left */
     // Top left
     if (inc_index == GO_LEFT_TO_RIGHT && start_row == 0)
     {
@@ -437,7 +437,7 @@ void *puzzleThreadSolver(void *temp)
         }
     }
 
-    // Top to bottom and bottom to top
+    /* Top to bottom and bottom to top */
 
     // Top left
     if (inc_index == GO_TOP_TO_BOTTOM && start_col == 0)
@@ -503,15 +503,17 @@ main( int argc, char **argv )
     pthread_t puzzleThread[numThreads];
     fill_t fillArray[numThreads];
 
+    // Define values to get from input for grid and piece list
     int return_value = 0;
     piece_list_t piece_list;
     grid_t grid;
     int i;
 
+    // Get input from STDIN for piece list and grid
     if (get_input( &grid, &piece_list ))
     {
 
-        // Create all structs
+        /* Create all of the structs to pass in with the threads */
         for (i = 0; i < numThreads; i++)
         {
             // Create fillStruct for this thread
@@ -574,12 +576,11 @@ main( int argc, char **argv )
             fillArray[i] = fillStruct;
         }
 
-        // Create all threads
+        /* Create all of the threads at once */
         for (i = 0; i < numThreads; i++)
         {
-            //printf("Created thread%d\n", i+1);
             // Create a single puzzle thread to solve starting in top left
-            if (pthread_create(&puzzleThread[i], NULL, puzzleThreadSolver, &fillArray[i]))
+            if (pthread_create(&puzzleThread[i], NULL, &puzzleThreadSolver, &fillArray[i]))
             {
                 fprintf(stderr, "Error creating thread\n");
             }
@@ -587,7 +588,7 @@ main( int argc, char **argv )
 
         /* End Thread creation */
 
-        // Wait for threads to finish that are created
+        // Wait for threads to finish that are created and join them to main
         for (i = 0; i < numThreads; i++)
         {
             // Wait for puzzle threads to end
@@ -605,5 +606,6 @@ main( int argc, char **argv )
         release_memory( &grid, &piece_list );
     }
 
+    // Exit the program with return value
     return return_value;
 }
