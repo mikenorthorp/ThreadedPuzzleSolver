@@ -495,7 +495,7 @@ main( int argc, char **argv )
     }
     else
     {
-        printf("Please put the number of threads you want as an argument");
+        printf("Please put the number of threads you want as an argument\n");
         return 1;
     }
 
