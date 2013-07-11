@@ -573,7 +573,6 @@ main( int argc, char **argv )
         /* Create all of the threads at once */
         for (i = 0; i < numThreads; i++)
         {
-            //printf("Creating thread%d%d%d\n", fillArray[i].start_col, fillArray[i].start_row, fillArray[i].inc_index);
             // Create a single puzzle thread to solve starting in top left
             if (pthread_create(&puzzleThread[i], NULL, &puzzleThreadSolver, &fillArray[i]))
             {
