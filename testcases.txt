@@ -1,0 +1,36 @@
+------------------------------
+Test Cases Passed
+------------------------------
+All below
+
+-------------------------------
+Input Related
+-------------------------------
+
+1. Puzzle correctly reads in generated puzzles
+2. Puzzle reads in a number of threads and returns an error if no threads are specified
+
+-------------------------------
+Output Related
+-------------------------------
+
+1. Puzzle is shown once threads complete
+
+-------------------------------
+Thread Related
+-------------------------------
+1. Threads all create on program start up
+2. Threads wait until each one is finished before ending the program
+3. All threads get assigned to different corners and directions (up until 8 then
+   it loops)
+4. Threads are created based on the number grabbed from arguments on command line.
+5. 8+ threads can be created.
+
+-------------------------------
+Other
+-------------------------------
+
+1. Make file builds properly
+2. Program compiles on bluenose properly
+3. All memory is deallocated at program exit.
+4. Program solves all puzzles
