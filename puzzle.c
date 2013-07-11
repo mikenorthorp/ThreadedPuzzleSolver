@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 #define LABEL_LEN (12)
 #define MAXLINELEN (8096)
@@ -42,8 +43,10 @@ typedef struct
     is not uncommon in graphics systems.
 */
 
+/* Added a lock to the cell to lock to keep threads synced */
 typedef struct
 {
+    sem_t threadLock;
     int north;
     int west;
     piece_t *piece;
@@ -54,6 +57,7 @@ typedef struct
     cell_t **cells;
     int numcols;
     int numrows;
+    int testnum;
 } grid_t;
 
 /* Create a sturct for all of the fill_any_dir arguments to pass into threads */
@@ -162,6 +166,9 @@ get_input( grid_t *grid, piece_list_t *piece_list )
             space[i].north = NO_PIECE_INDEX;
             space[i].west = NO_PIECE_INDEX;
             space[i].piece = NULL;
+
+            // Set up lock for this cell
+            sem_init(&space[i].threadLock, 0, 1);
         }
 
         /* Get the top. */
@@ -285,73 +292,192 @@ fill_any_dir( grid_t *grid, piece_list_t *piece_list,
        puzzle grid cell that is already filled in. */
 
     while ((row >= 0) && (col >= 0) && (row < grid->numrows) &&
-            (col < grid->numcols) && (grid->cells[col][row].piece == NULL))
+            (col < grid->numcols))
     {
+        // Wait for piece to unlock and then solve it if not solved
+        sem_wait(&grid->cells[col][row].threadLock);
 
-        /* Ensure that we're ready for the piece by making sure that at least
-           two tabs are defined. */
-
-        count = 0;
-        if (grid->cells[col][row].north != NO_PIECE_INDEX) count++;
-        if (grid->cells[col][row].west != NO_PIECE_INDEX) count++;
-        if (grid->cells[col][row + 1].north != NO_PIECE_INDEX) count++;
-        if (grid->cells[col + 1][row].west != NO_PIECE_INDEX) count++;
-
-        if (count >= 2)
+        // If solved skip and unlock, else solve
+        if (grid->cells[col][row].piece == NULL)
         {
 
-            /* Search the set of pieces for what will go in this grid position. */
+            /* Ensure that we're ready for the piece by making sure that at least
+               two tabs are defined. */
 
-            found = NO_PIECE_INDEX;
-            for (j = 0; (j < grid->numcols * grid->numrows) && (found == NO_PIECE_INDEX); j++)
+            count = 0;
+            if (grid->cells[col][row].north != NO_PIECE_INDEX) count++;
+            if (grid->cells[col][row].west != NO_PIECE_INDEX) count++;
+            if (grid->cells[col][row + 1].north != NO_PIECE_INDEX) count++;
+            if (grid->cells[col + 1][row].west != NO_PIECE_INDEX) count++;
+
+            if (count >= 2)
             {
+                /* Search the set of pieces for what will go in this grid position. */
 
-                /* I will find the first piece whose tabs match the defined tabs of
-                   the grid cell.  This will find the unique pieces _if_ the grid
-                   cell has at least two adjacent tabs that are not -1. */
-
-                if (
-                    ((grid->cells[col][row].north == NO_PIECE_INDEX) ||
-                     (grid->cells[col][row].north == piece_list->pieces[j].tab[NORTH_TAB])) &&
-                    ((grid->cells[col + 1][row].west == NO_PIECE_INDEX) ||
-                     (grid->cells[col + 1][row].west == piece_list->pieces[j].tab[EAST_TAB])) &&
-                    ((grid->cells[col][row + 1].north == NO_PIECE_INDEX) ||
-                     (grid->cells[col][row + 1].north == piece_list->pieces[j].tab[SOUTH_TAB])) &&
-                    ((grid->cells[col][row].west == NO_PIECE_INDEX) ||
-                     (grid->cells[col][row].west == piece_list->pieces[j].tab[WEST_TAB]))
-                )
+                found = NO_PIECE_INDEX;
+                for (j = 0; (j < grid->numcols * grid->numrows) && (found == NO_PIECE_INDEX); j++)
                 {
-                    found = j;
+
+                    /* I will find the first piece whose tabs match the defined tabs of
+                       the grid cell.  This will find the unique pieces _if_ the grid
+                       cell has at least two adjacent tabs that are not -1. */
+
+                    if (
+                        ((grid->cells[col][row].north == NO_PIECE_INDEX) ||
+                         (grid->cells[col][row].north == piece_list->pieces[j].tab[NORTH_TAB])) &&
+                        ((grid->cells[col + 1][row].west == NO_PIECE_INDEX) ||
+                         (grid->cells[col + 1][row].west == piece_list->pieces[j].tab[EAST_TAB])) &&
+                        ((grid->cells[col][row + 1].north == NO_PIECE_INDEX) ||
+                         (grid->cells[col][row + 1].north == piece_list->pieces[j].tab[SOUTH_TAB])) &&
+                        ((grid->cells[col][row].west == NO_PIECE_INDEX) ||
+                         (grid->cells[col][row].west == piece_list->pieces[j].tab[WEST_TAB]))
+                    )
+                    {
+                        found = j;
+                    }
+                }
+
+                /* When we get the piece, fit it into the grid and update the tabs of
+                   the grid for all surrounding grid cells. */
+
+                if (found != NO_PIECE_INDEX)
+                {
+                    grid->cells[col][row].piece = &(piece_list->pieces[found]);
+                    grid->cells[col][row].north = piece_list->pieces[found].tab[NORTH_TAB];
+                    grid->cells[col + 1][row].west = piece_list->pieces[found].tab[EAST_TAB];
+                    grid->cells[col][row + 1].north = piece_list->pieces[found].tab[SOUTH_TAB];
+                    grid->cells[col][row].west = piece_list->pieces[found].tab[WEST_TAB];
+                }
+                else
+                {
+                    printf("Error piece not found!!!\n");
                 }
             }
 
-            /* When we get the piece, fit it into the grid and update the tabs of
-               the grid for all surrounding grid cells. */
+            // Unlock after solving the piece
+            sem_post(&grid->cells[col][row].threadLock);
 
-            if (found != NO_PIECE_INDEX)
-            {
-                grid->cells[col][row].piece = &(piece_list->pieces[found]);
-                grid->cells[col][row].north = piece_list->pieces[found].tab[NORTH_TAB];
-                grid->cells[col + 1][row].west = piece_list->pieces[found].tab[EAST_TAB];
-                grid->cells[col][row + 1].north = piece_list->pieces[found].tab[SOUTH_TAB];
-                grid->cells[col][row].west = piece_list->pieces[found].tab[WEST_TAB];
-            }
-
+        }
+        // Unlock if piece is solved after getting access to the critical section
+        else
+        {
+            sem_post(&grid->cells[col][row].threadLock);
         }
 
         /* Go to the next grid cell in the direction given as a parameter. */
-
         row += row_inc[inc_index];
         col += col_inc[inc_index];
+
     }
 }
 
 /* This function is called when a new thread is created, and starts in a position
    dependent on the fill sturct contents */
-void *puzzleThreadSolver(void *fill)
+void *puzzleThreadSolver(void *temp)
 {
-    printf("Testing thread\n");
+    // Set temp to a fill_t struct
+    fill_t *fill = (fill_t *)temp;
 
+    // Define variables to pass into fill_in_dir
+    piece_list_t *piece_list;
+    grid_t *grid;
+    int i;
+    int start_col;
+    int start_row;
+    int inc_index;
+
+    // Get info to pass into fill_to_dir
+    grid = fill->grid;
+    piece_list = fill->piece_list;
+    start_col = fill->start_col;
+    start_row = fill->start_row;
+    inc_index = fill->inc_index;
+
+    // Call fill_to_dir based on inc_index and start row
+
+    // Left to right and right to left
+
+    // Top left
+    if (inc_index == GO_LEFT_TO_RIGHT && start_row == 0)
+    {
+        for (i = start_row; i < grid->numrows; i++)
+        {
+            //printf("Test1 Col:%d Row%d\n", start_col, i);
+            fill_any_dir(grid, piece_list, start_col, i, GO_LEFT_TO_RIGHT);
+        }
+    }
+
+    // Bottom right
+    if (inc_index == GO_RIGHT_TO_LEFT && start_row == grid->numrows - 1)
+    {
+        for (i = start_row; i >= 0; i--)
+        {
+            //printf("Test2 Col:%d Row%d\n", start_col, i);
+            fill_any_dir(grid, piece_list, start_col, i, GO_RIGHT_TO_LEFT);
+        }
+    }
+
+    //Top right
+    if (inc_index == GO_RIGHT_TO_LEFT && start_row == 0)
+    {
+        for (i = start_row; i < grid->numrows; i++)
+        {
+            //printf("Test3 Col:%d Row%d\n", start_col, i);
+            fill_any_dir(grid, piece_list, start_col, i, GO_RIGHT_TO_LEFT);
+        }
+    }
+
+    //Bottom left
+    if (inc_index == GO_LEFT_TO_RIGHT && start_row == grid->numrows - 1)
+    {
+        for (i = start_row; i >= 0; i--)
+        {
+            //printf("Test4 Col:%d Row%d\n", start_col, i);
+            fill_any_dir(grid, piece_list, start_col, i, GO_LEFT_TO_RIGHT);
+        }
+    }
+
+    // Top to bottom and bottom to top
+
+    // Top left
+    if (inc_index == GO_TOP_TO_BOTTOM && start_col == 0)
+    {
+        for (i = start_col; i < grid->numcols; i++)
+        {
+            //printf("Test5 Col:%d Row%d\n", i, start_row);
+            fill_any_dir(grid, piece_list, i, start_row, GO_TOP_TO_BOTTOM);
+        }
+    }
+
+    // Bottom right
+    if (inc_index == GO_BOTTOM_TO_TOP && start_col == grid->numcols - 1)
+    {
+        for (i = start_col; i >= 0; i--)
+        {
+            //printf("Test6 Col:%d Row%d\n", i, start_row);
+            fill_any_dir(grid, piece_list, i, start_row, GO_BOTTOM_TO_TOP);
+        }
+    }
+
+    //Top right
+    if (inc_index == GO_TOP_TO_BOTTOM && start_col == grid->numcols - 1)
+    {
+        for (i = start_col; i >= 0; i--)
+        {
+            //printf("Test7 Col:%d Row%d\n", i, start_row);
+            fill_any_dir(grid, piece_list, i, start_row, GO_TOP_TO_BOTTOM);
+        }
+    }
+
+    //Bottom left
+    if (inc_index == GO_BOTTOM_TO_TOP && start_col == 0)
+    {
+        for (i = start_col; i < grid->numcols; i++)
+        {
+            //printf("Test8 Col:%d Row%d\n", i, start_row);
+            fill_any_dir(grid, piece_list, i, start_row, GO_BOTTOM_TO_TOP);
+        }
+    }
 
     return NULL;
 }
@@ -362,12 +488,20 @@ main( int argc, char **argv )
 
     /* Take in the threads from command line using argv and create
        that many threads */
+    int numThreads;
+    if (argc >= 2)
+    {
+        numThreads = atoi(argv[1]);
+    }
+    else
+    {
+        printf("Please put the number of threads you want as an argument");
+        return 1;
+    }
 
-    int numThreads = 2;
-
-    // Define threads
-    pthread_t puzzleThread;
-    pthread_t puzzleThread2;
+    // Define threads array
+    pthread_t puzzleThread[numThreads];
+    fill_t fillArray[numThreads];
 
     int return_value = 0;
     piece_list_t piece_list;
@@ -377,77 +511,91 @@ main( int argc, char **argv )
     if (get_input( &grid, &piece_list ))
     {
 
-        // If 1 thread
-        if (numThreads >= 1)
+        // Create all structs
+        for (i = 0; i < numThreads; i++)
         {
-            printf("Creating thread 1\n");
             // Create fillStruct for this thread
-            fill_t *fillStruct;
+            fill_t fillStruct;
 
-            // Allocate memory for fill_t
-            fillStruct = (fill_t *) malloc( sizeof( fill_t ) );
+            fillStruct.grid = &grid;
+            fillStruct.piece_list = &piece_list;
 
-            fillStruct->grid = &grid;
-            fillStruct->piece_list = &piece_list;
-            fillStruct->start_col = 0;
-            fillStruct->start_row = 0;
-            fillStruct->inc_index = GO_RIGHT_TO_LEFT;
-
-            // Create a single puzzle thread to solve starting in top left
-            if (pthread_create(&puzzleThread, NULL, puzzleThreadSolver, fillStruct))
+            // Pick which corner to put the thread in, and to go which direction
+            if (i % 8 == 0) // Top left
             {
-                fprintf(stderr, "Error creating thread\n");
+                fillStruct.start_col = 0;
+                fillStruct.start_row = 0;
+                fillStruct.inc_index = GO_LEFT_TO_RIGHT;
             }
+            else if (i % 8 == 1) // Bottom right
+            {
+                fillStruct.start_col = grid.numcols - 1;
+                fillStruct.start_row = grid.numrows - 1;
+                fillStruct.inc_index = GO_RIGHT_TO_LEFT;
+            }
+            else if (i % 8 == 2) // Top right
+            {
+                fillStruct.start_col = grid.numcols - 1;
+                fillStruct.start_row = 0;
+                fillStruct.inc_index = GO_RIGHT_TO_LEFT;
+            }
+            else if ( i % 8 == 3) // Bottom left
+            {
+                fillStruct.start_col = 0;
+                fillStruct.start_row = grid.numrows - 1;
+                fillStruct.inc_index = GO_LEFT_TO_RIGHT;
+            }
+            else if ( i % 8 == 4) // Top left top-bottom
+            {
+                fillStruct.start_col = 0;
+                fillStruct.start_row = 0;
+                fillStruct.inc_index = GO_TOP_TO_BOTTOM;
+            }
+            else if ( i % 8 == 5) // Bottom right bottom-top
+            {
+                fillStruct.start_col = grid.numcols - 1;
+                fillStruct.start_row = grid.numrows - 1;
+                fillStruct.inc_index = GO_BOTTOM_TO_TOP;
+            }
+            else if ( i % 8 == 6) // Top right top-bottom
+            {
+                fillStruct.start_col = grid.numcols - 1;
+                fillStruct.start_row = 0;
+                fillStruct.inc_index = GO_TOP_TO_BOTTOM;
+            }
+            else if ( i % 8 == 7) // Bottom left bottom-top
+            {
+                fillStruct.start_col = 0;
+                fillStruct.start_row = grid.numrows - 1;
+                fillStruct.inc_index = GO_BOTTOM_TO_TOP;
+            }
+
+            // Put the fillStruct into the array of fill_t
+            fillArray[i] = fillStruct;
         }
 
-        // If 2 threads
-        if (numThreads >= 2)
+        // Create all threads
+        for (i = 0; i < numThreads; i++)
         {
-            printf("Creating thread 2\n");
-               // Create fillStruct for this thread
-            fill_t *fillStruct;
-
-            // Allocate memory for fill_t
-            fillStruct = (fill_t *) malloc( sizeof( fill_t ) );
-
-            fillStruct->grid = &grid;
-            fillStruct->piece_list = &piece_list;
-            fillStruct->start_col = grid.numcols - 1;
-            fillStruct->start_row = grid.numrows - 1;
-            fillStruct->inc_index = GO_LEFT_TO_RIGHT;
-
-            // Create a single puzzle thread to solve starting in bottom right
-            if (pthread_create(&puzzleThread2, NULL, puzzleThreadSolver, fillStruct))
+            //printf("Created thread%d\n", i+1);
+            // Create a single puzzle thread to solve starting in top left
+            if (pthread_create(&puzzleThread[i], NULL, puzzleThreadSolver, &fillArray[i]))
             {
                 fprintf(stderr, "Error creating thread\n");
             }
         }
-
-
-        /* If more than 8 threads loop rest */
 
         /* End Thread creation */
 
-        /* Solve the puzzle row by row starting with the top row. */
-
-        /*
-        for (i = 0; i < grid.numrows; i++)
+        // Wait for threads to finish that are created
+        for (i = 0; i < numThreads; i++)
         {
-            fill_any_dir(&grid, &piece_list, 0, i, GO_LEFT_TO_RIGHT);
-        }
-        */
-
-        // Wait for puzzle threads to end
-        if (pthread_join(puzzleThread, NULL))
-        {
-            fprintf(stderr, "Error joining thread\n");
-            return_value = 2;
-        }
-
-        if (pthread_join(puzzleThread2, NULL))
-        {
-            fprintf(stderr, "Error joining thread\n");
-            return_value = 2;
+            // Wait for puzzle threads to end
+            if (pthread_join(puzzleThread[i], NULL))
+            {
+                fprintf(stderr, "Error joining thread\n");
+                return_value = 2;
+            }
         }
 
         /* Show what the puzzle came out to be. */
