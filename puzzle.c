@@ -516,69 +516,64 @@ main( int argc, char **argv )
         /* Create all of the structs to pass in with the threads */
         for (i = 0; i < numThreads; i++)
         {
-            // Create fillStruct for this thread
-            fill_t fillStruct;
-
-            fillStruct.grid = &grid;
-            fillStruct.piece_list = &piece_list;
+            fillArray[i].grid = &grid;
+            fillArray[i].piece_list = &piece_list;
 
             // Pick which corner to put the thread in, and to go which direction
             if (i % 8 == 0) // Top left
             {
-                fillStruct.start_col = 0;
-                fillStruct.start_row = 0;
-                fillStruct.inc_index = GO_LEFT_TO_RIGHT;
+                fillArray[i].start_col = 0;
+                fillArray[i].start_row = 0;
+                fillArray[i].inc_index = GO_LEFT_TO_RIGHT;
             }
             else if (i % 8 == 1) // Bottom right
             {
-                fillStruct.start_col = grid.numcols - 1;
-                fillStruct.start_row = grid.numrows - 1;
-                fillStruct.inc_index = GO_RIGHT_TO_LEFT;
+                fillArray[i].start_col = grid.numcols - 1;
+                fillArray[i].start_row = grid.numrows - 1;
+                fillArray[i].inc_index = GO_RIGHT_TO_LEFT;
             }
             else if (i % 8 == 2) // Top right
             {
-                fillStruct.start_col = grid.numcols - 1;
-                fillStruct.start_row = 0;
-                fillStruct.inc_index = GO_RIGHT_TO_LEFT;
+                fillArray[i].start_col = grid.numcols - 1;
+                fillArray[i].start_row = 0;
+                fillArray[i].inc_index = GO_RIGHT_TO_LEFT;
             }
             else if ( i % 8 == 3) // Bottom left
             {
-                fillStruct.start_col = 0;
-                fillStruct.start_row = grid.numrows - 1;
-                fillStruct.inc_index = GO_LEFT_TO_RIGHT;
+                fillArray[i].start_col = 0;
+                fillArray[i].start_row = grid.numrows - 1;
+                fillArray[i].inc_index = GO_LEFT_TO_RIGHT;
             }
             else if ( i % 8 == 4) // Top left top-bottom
             {
-                fillStruct.start_col = 0;
-                fillStruct.start_row = 0;
-                fillStruct.inc_index = GO_TOP_TO_BOTTOM;
+                fillArray[i].start_col = 0;
+                fillArray[i].start_row = 0;
+                fillArray[i].inc_index = GO_TOP_TO_BOTTOM;
             }
             else if ( i % 8 == 5) // Bottom right bottom-top
             {
-                fillStruct.start_col = grid.numcols - 1;
-                fillStruct.start_row = grid.numrows - 1;
-                fillStruct.inc_index = GO_BOTTOM_TO_TOP;
+                fillArray[i].start_col = grid.numcols - 1;
+                fillArray[i].start_row = grid.numrows - 1;
+                fillArray[i].inc_index = GO_BOTTOM_TO_TOP;
             }
             else if ( i % 8 == 6) // Top right top-bottom
             {
-                fillStruct.start_col = grid.numcols - 1;
-                fillStruct.start_row = 0;
-                fillStruct.inc_index = GO_TOP_TO_BOTTOM;
+                fillArray[i].start_col = grid.numcols - 1;
+                fillArray[i].start_row = 0;
+                fillArray[i].inc_index = GO_TOP_TO_BOTTOM;
             }
             else if ( i % 8 == 7) // Bottom left bottom-top
             {
-                fillStruct.start_col = 0;
-                fillStruct.start_row = grid.numrows - 1;
-                fillStruct.inc_index = GO_BOTTOM_TO_TOP;
+                fillArray[i].start_col = 0;
+                fillArray[i].start_row = grid.numrows - 1;
+                fillArray[i].inc_index = GO_BOTTOM_TO_TOP;
             }
-
-            // Put the fillStruct into the array of fill_t
-            fillArray[i] = fillStruct;
         }
 
         /* Create all of the threads at once */
         for (i = 0; i < numThreads; i++)
         {
+            //printf("Creating thread%d%d%d\n", fillArray[i].start_col, fillArray[i].start_row, fillArray[i].inc_index);
             // Create a single puzzle thread to solve starting in top left
             if (pthread_create(&puzzleThread[i], NULL, &puzzleThreadSolver, &fillArray[i]))
             {
